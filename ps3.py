@@ -10,6 +10,7 @@
 import math
 import random
 import string
+from copy import copy, deepcopy
 
 VOWELS = 'aeiou'
 CONSONANTS = 'bcdfghjklmnpqrstvwxyz'
@@ -95,7 +96,7 @@ def get_word_score(word, n):
     wordlen = len(word)
     sum_ = 0
     if word == '':
-        return 1
+        return 0
     
     
     for letter in word:
@@ -103,7 +104,7 @@ def get_word_score(word, n):
             sum_ += SCRABBLE_LETTER_VALUES[letter]
 
     total_points = (sum_) * ((7 * wordlen) - 3 *(n - wordlen))
-    return total_points if total_points >= 1 else 1
+    return total_points if total_points > sum_ else sum_
     
 
 #
@@ -121,10 +122,9 @@ def display_hand(hand):
 
     hand: dictionary (string -> int)
     """
-    
     for letter in hand.keys():
         for j in range(hand[letter]):
-             print(letter, end=' ')      # print all on the same line
+            print(letter, end=' ')      # print all on the same line
     print()                              # print an empty line
     return ''
 #
@@ -155,8 +155,20 @@ def deal_hand(n):
     for i in range(num_vowels, n):    
         x = random.choice(CONSONANTS)
         hand[x] = hand.get(x, 0) + 1
+
+    final_hand = hand.copy()
+    for k, v in hand.items():
+        if k in VOWELS:
+            if v == 1:
+                del final_hand[k]
+                final_hand['*'] = v
+                break
+            else:
+                final_hand[k] -= 1
+                final_hand['*'] = 1
+                break
     
-    return hand
+    return final_hand
 
 #
 # Problem #2: Update a hand by removing letters
@@ -179,13 +191,19 @@ def update_hand(hand, word):
     hand: dictionary (string -> int)    
     returns: dictionary (string -> int)
     """
-    
+    #updated_hand = hand.copy()
     for letter in word:
-        if letter in hand.keys():
-            if hand[letter] != 0:
-                hand[letter] -= 1
+        if letter.lower() in hand.keys():
+            if hand[letter.lower()] != 0:
+                hand[letter.lower()] -= 1
 
-    return {k:v for k, v in hand.items() if v != 0}
+    
+
+    return hand
+
+    
+
+
 
 #
 # Problem #3: Test word validity
@@ -202,14 +220,29 @@ def is_valid_word(word, hand, word_list):
     returns: boolean
     """
     count = 0
-    if word not in word_list:
-        return False
+    temp_key_count = hand.copy()
+    for item in word_list:
+        item = item.strip('\n').lower()
+        if word.lower() == item:
+            for letter in word:
+                letter = letter.lower()
+                if letter in temp_key_count.keys():
+                    if temp_key_count[letter] >= 1:
+                        count += 1
+                        temp_key_count[letter] -= 1
 
-    for letter in word:
-        if letter in hand.keys():
-            count += 1
+    for letter in word.lower():
+        if letter == '*':
+            for i in range(len(VOWELS)):
+                new_word = word.replace('*', VOWELS[i])
+                for item in word_list:
+                    item = item.strip('\n').lower()
+                    if new_word.lower() == item:
+                        return True
+                        
 
     return count == len(word)
+    
 
 #
 # Problem #5: Playing a hand
@@ -387,41 +420,63 @@ def play_game(word_list):
     word_list: list of lowercase strings
     """
     final_score = 0
+    round_score = []
+    temp_score = 0
     already_subbed = False
     replay = False
+    replay2 = False
     hand_score = 0
     
-    num_hands = int(input('Please enter the number of hands you would like to play: '))
+    try:
+        num_hands = int(input('Please enter the number of hands you would like to play: '))
+
+    except ValueError:
+        num_hands = int(input('Please enter the NUMBER of hands you would like to play: '))
 
     while num_hands != 0:
         hand = deal_hand(HAND_SIZE)
+        
         if not already_subbed:
             display_hand(hand)
+            
         if not already_subbed and not replay:
             substitute = input('Would you like to substitute a letter in your hand for a random letter? Answer "yes" or "no". ').lower().strip()
+            while substitute != 'yes' and substitute != 'no':
+                substitute = input('Please enter "yes" or "no": ')
             if substitute == 'yes':
                 letter = input('What letter would you like to replace? ').lower().strip()
                 substitute_hand(hand, letter)
                 already_subbed = True
                 
         round_ = play_hand(hand, word_list)
+        round_score.append(round_)
+
+        if replay and not replay2:
+            temp_score = round_
+            if temp_score > round_score[-2]:
+                round_score[-2] = temp_score
+                round_score[-1] = 0
+                del round_score[-1]
+            else:
+                del round_score[-1]
+            replay2 = True
+                
 
         if not replay:
             decision = input('Would you like to replay this hand to try to earn a better score? ')
+            while decision != 'yes' and decision != 'no':
+                decision = input('Sorry, please enter "yes" or "no": ')
             if decision == 'yes':
-                hand = hand
-                round_two = play_hand(hand, word_list)
-                if round_two > round_:
-                    print('yes')
-                    final_score += round_two
-                else:
-                    print('no')
-                    final_score += round_
                 replay = True
+                num_hands += 1
 
-        final_score += round_
+                
+        print(round_score)
+        print(temp_score)
+        final_score = sum(round_score)
         num_hands -= 1
-
+        
+    
     print(f'Your final score was {final_score}.')
         
     
